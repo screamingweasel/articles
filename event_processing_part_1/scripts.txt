@@ -1,0 +1,111 @@
+################################################################################################
+# scripts to accompany article Bridging the gap between Event and Process time with Hive
+################################################################################################
+
+################################################################################################
+# Part 1
+################################################################################################
+mkdir -p /tmp/video
+cd /tmp/video
+wget https://raw.githubusercontent.com/screamingweasel/sample-data/master/video/2017011200-00001.txt
+wget https://raw.githubusercontent.com/screamingweasel/sample-data/master/video/2017011201-00001.txt
+wget https://raw.githubusercontent.com/screamingweasel/sample-data/master/video/2017011202-00001.txt
+
+hadoop fs -rm -r /landing/video_events_stg
+hadoop fs -mkdir -p /landing/video_events_stg
+
+hadoop fs -put /tmp/video/2017011200-00001.txt /landing/video_events_stg/
+
+
+wget https://raw.githubusercontent.com/screamingweasel/sample-data/master/schema/video_events_stg.hql
+hive -f video_events_stg.hql
+CREATE EXTERNAL TABLE video_events_stg (
+  device_id string,
+  event_type string,
+  event_time string,
+  play_time_ms bigint,
+  buffer_time_ms bigint)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE
+LOCATION '/landing/video_events_stg';
+
+https://raw.githubusercontent.com/screamingweasel/sample-data/master/schema/video_events.hql
+hive -f video_events.hql
+
+DROP TABLE IF EXISTS default.video_events;
+
+CREATE TABLE video_events (
+  device_id string,
+  event_type string,
+  event_time timestamp,
+  play_time_ms bigint,
+  buffer_time_ms bigint)
+PARTITIONED BY ( 
+  event_year string, 
+  event_month string, 
+  event_day string,
+  event_hour string,
+  process_time string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE;
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.optimize.sort.dynamic.partition=true;
+
+INSERT INTO TABLE default.video_events
+PARTITION (event_year, event_month, event_day, event_hour, process_time)
+SELECT 
+device_id,
+event_type,
+CAST(regexp_replace(regexp_replace(event_time,'Z',''),'T',' ') as timestamp) as event_time,
+play_time_ms,
+buffer_time_ms,
+substr(event_time,1,4)  AS event_year,
+substr(event_time,6,2)  AS event_month,
+substr(event_time,9,2)  AS event_day,
+substr(event_time,12,2) AS event_hour,
+substr(regexp_extract(input__file__name, '.*\/(.*)', 1),1,10) AS process_time
+FROM default.video_events_stg;
+
+show partitions default.video_events;
+
+hadoop fs -rm -skipTrash /landing/video_events_stg/*
+hadoop fs -put /tmp/video/2017011201-00001.txt /landing/video_events_stg/
+hive -f video_events_insert.hql
+
+hadoop fs -rm -skipTrash /landing/video_events_stg/*
+hadoop fs -put /tmp/video/2017011202-00001.txt /landing/video_events_stg/
+hive -f video_events_insert.hql
+
+
+show partitions default.video_events;
+event_year=2017/event_month=01/event_day=11/event_hour=21/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=22/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=22/process_time=2017011201
+event_year=2017/event_month=01/event_day=11/event_hour=23/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=23/process_time=2017011201
+event_year=2017/event_month=01/event_day=11/event_hour=23/process_time=2017011202
+event_year=2017/event_month=01/event_day=12/event_hour=00/process_time=2017011201
+event_year=2017/event_month=01/event_day=12/event_hour=00/process_time=2017011202
+event_year=2017/event_month=01/event_day=12/event_hour=01/process_time=2017011202
+
+select count(*) from default.video_events
+3000
+
+ALTER TABLE default.video_events DROP PARTITION (event_year='2017',event_month='01',event_day='11',event_hour='22',process_time='2017011201');
+ALTER TABLE default.video_events DROP PARTITION (event_year='2017',event_month='01',event_day='11',event_hour='23',process_time='2017011201');
+ALTER TABLE default.video_events DROP PARTITION (event_year='2017',event_month='01',event_day='12',event_hour='00',process_time='2017011201');
+
+show partitions video_events;
+OK
+event_year=2017/event_month=01/event_day=11/event_hour=21/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=22/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=23/process_time=2017011200
+event_year=2017/event_month=01/event_day=11/event_hour=23/process_time=2017011202
+event_year=2017/event_month=01/event_day=12/event_hour=00/process_time=2017011202
+event_year=2017/event_month=01/event_day=12/event_hour=01/process_time=2017011202
+
+select count(*) from default.video_events
+2000

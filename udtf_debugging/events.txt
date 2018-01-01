@@ -1,0 +1,2 @@
+{ "deviceId": "13a46b21-9528-4eb1-93bd-303a3b3e6b6a", "events": [ { "Process_Started": { "timestamp": "2017-06-01T18:26:24.444Z" } }, { "Process_Stopped": { "timestamp": "2017-06-01T18:26:24.444Z", "errorReason": "-1", "errorMsg": "The operation couldn’t be completed." } } ] }
+{ "deviceId": "9cd57d50-4d0e-457e-9fd3-05b9e56644e6", "events": [ { "Process_Started": { "timestamp": "2017-06-02T00:20:20.400Z" } }, { "Process_Completed": { "timestamp": "2017-06-02T02:20:29.020" } } ] }
